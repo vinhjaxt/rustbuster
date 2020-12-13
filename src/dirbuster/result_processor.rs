@@ -4,15 +4,16 @@ use serde::{Deserialize, Serialize};
 pub struct SingleDirScanResult {
     pub url: String,
     pub method: String,
-    pub status: String,
+    pub status: u16,
+    pub size: Option<String>,
     pub error: Option<String>,
     pub extra: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ResultProcessorConfig {
-    pub include: Vec<String>,
-    pub ignore: Vec<String>,
+    pub include: Vec<u16>,
+    pub ignore: Vec<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,14 +35,14 @@ impl ScanResult {
         let mut ignore = false;
         let mut include = false;
         for code in self.config.ignore.iter() {
-            if res.status.starts_with(code) {
+            if res.status == *code {
                 ignore = true;
                 break;
             }
         }
 
         for code in self.config.include.iter() {
-            if res.status.starts_with(code) {
+            if res.status == *code {
                 include = true;
                 break;
             }

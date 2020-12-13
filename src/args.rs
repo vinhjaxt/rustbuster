@@ -24,8 +24,8 @@ pub struct HTTPArgs {
     pub url: String,
     pub ignore_certificate: bool,
     pub http_headers: Vec<(String, String)>,
-    pub include_status_codes: Vec<String>,
-    pub ignore_status_codes: Vec<String>,
+    pub include_status_codes: Vec<u16>,
+    pub ignore_status_codes: Vec<u16>,
 }
 
 pub struct BodyArgs {
@@ -35,6 +35,7 @@ pub struct BodyArgs {
 
 pub struct DirArgs {
     pub append_slash: bool,
+    pub append_ext: bool,
     pub extensions: Vec<String>,
 }
 
@@ -193,6 +194,11 @@ pub fn set_dir_args<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
             .help("Tries to also append / to the base request")
             .short("f"),
     )
+    .arg(
+        Arg::with_name("append-ext")
+            .long("append-ext")
+            .help("Tries to append ext instead of replace %ext% to the base request (not compatible with dirsearch dictionary, so ext must have a dot [.] prefix)"),
+    )
 }
 
 pub fn set_wordlist_args<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
@@ -287,13 +293,13 @@ pub fn extract_common_args<'a>(submatches: &clap::ArgMatches<'a>) -> CommonArgs 
     let output = submatches.value_of("output").unwrap();
 
     if let Some((Width(w), Height(h))) = terminal_size() {
-        if w < 122 {
+        if w < 70 {
             no_banner = true;
         }
 
-        if w < 104 {
+        if w < 80 {
             warn!("Your terminal is {} cols wide and {} lines tall", w, h);
-            warn!("Disabling progress bar, minimum cols: 104");
+            warn!("Disabling progress bar, minimum cols: 80");
             no_progress_bar = true;
         }
     } else {
@@ -335,8 +341,8 @@ pub fn extract_http_args<'a>(submatches: &clap::ArgMatches<'a>) -> HTTPArgs {
             }
             s.parse::<hyper::StatusCode>().is_ok()
         })
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
+        .map(|s| s.parse::<hyper::StatusCode>().unwrap().as_u16())
+        .collect::<Vec<u16>>();
     let ignore_status_codes = submatches
         .values_of("ignore-status-codes")
         .unwrap()
@@ -346,8 +352,8 @@ pub fn extract_http_args<'a>(submatches: &clap::ArgMatches<'a>) -> HTTPArgs {
             }
             s.parse::<hyper::StatusCode>().is_ok()
         })
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
+        .map(|s| s.parse::<hyper::StatusCode>().unwrap().as_u16())
+        .collect::<Vec<u16>>();
 
     HTTPArgs {
         user_agent: user_agent.to_owned(),
@@ -397,6 +403,7 @@ pub fn extract_body_args<'a>(submatches: &clap::ArgMatches<'a>) -> BodyArgs {
 
 pub fn extract_dir_args<'a>(submatches: &clap::ArgMatches<'a>) -> DirArgs {
     let append_slash = submatches.is_present("append-slash");
+    let append_ext = submatches.is_present("append-ext");
     let extensions = submatches
         .values_of("extensions")
         .unwrap()
@@ -405,6 +412,7 @@ pub fn extract_dir_args<'a>(submatches: &clap::ArgMatches<'a>) -> DirArgs {
         .collect::<Vec<String>>();
     DirArgs {
         append_slash,
+        append_ext,
         extensions,
     }
 }

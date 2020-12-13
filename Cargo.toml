@@ -13,6 +13,7 @@ name = "librustbuster"
 path = "src/lib.rs"
 
 [dependencies]
+lazy_static = "1.4.0"
 hyper = "^0.12.28"
 pretty_env_logger = "^0.3.0"
 log = "^0.4.6"
@@ -29,6 +30,7 @@ regex = "^1.1.7"
 galvanic-test = "^0.2.0"
 galvanic-assert = "0.8.7"
 criterion = "^0.2.11"
+termion = "1.5.5"
 
 [[bench]]
 name = "rustbuster"

@@ -1,3 +1,6 @@
+#[path="../size_display.rs"]
+mod size_display;
+
 use futures::Stream;
 use hyper::{
     client::HttpConnector,
@@ -33,8 +36,8 @@ pub struct FuzzBuster {
     pub http_headers: Vec<(String, String)>,
     pub wordlist_paths: Vec<String>,
     pub url: String,
-    pub include_status_codes: Vec<String>,
-    pub ignore_status_codes: Vec<String>,
+    pub include_status_codes: Vec<u16>,
+    pub ignore_status_codes: Vec<u16>,
     pub include_body: Vec<String>,
     pub ignore_body: Vec<String>,
     pub no_progress_bar: bool,
@@ -89,7 +92,7 @@ impl FuzzBuster {
         };
         bar.set_draw_delta(100);
         bar.set_style(ProgressStyle::default_bar()
-            .template("{spinner} [{elapsed_precise}] {bar:40.red/white} {pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
+            .template("{spinner} [{elapsed_precise}] {bar:40.red/white}\n  {pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
             .progress_chars("#>-"));
 
         let stream = futures::stream::iter_ok(requests)
@@ -140,36 +143,50 @@ impl FuzzBuster {
                 let mut extra = msg.extra.unwrap_or("".to_owned());
 
                 if !extra.is_empty() {
-                    extra = format!("\n\t\t\t\t\t\t=> {}", extra)
+                    extra = format!("  ->  {}", extra)
                 }
 
-                let n_tabs = match msg.status.len() / 8 {
-                    3 => 1,
-                    2 => 2,
-                    1 => 3,
-                    0 => 4,
-                    _ => 0,
-                };
+                let mut size = msg.size.unwrap_or("0".to_owned());
+                match size.parse::<u64>() {
+                    Ok(n) => {
+                        size = format!("{:.1}", size_display::Size(n));
+                    },
+                    Err(_) => {},
+                }
+
+                let mut msgcolor = termion::color::Reset.fg_str();
+                if msg.status == 200 {
+                    msgcolor = termion::color::Green.fg_str();
+                } else if msg.status == 403 {
+                    msgcolor = termion::color::Blue.fg_str();
+                } else if msg.status == 401 {
+                    msgcolor = termion::color::Yellow.fg_str();
+                } else if !extra.is_empty() {
+                    msgcolor = termion::color::Cyan.fg_str();
+                }
 
                 if self.no_progress_bar {
                     println!(
-                        "{}\t{}{}{} ({:?}){}",
+                        "{}{}  {} - {:^7} -  {} ({:?}){}",
+                        msgcolor,
                         msg.method,
                         msg.status,
-                        "\t".repeat(n_tabs),
+                        size,
                         msg.url,
                         msg.payload,
                         extra,
                     );
                 } else {
                     bar.println(format!(
-                        "{}\t{}{}{}\n\t\t\t\t\t\t=> PAYLOAD: {:?}{}",
+                        "{}{}  {} - {:^7} -  {} -> PAYLOAD: {:?}{}{}",
+                        msgcolor,
                         msg.method,
                         msg.status,
-                        "\t".repeat(n_tabs),
+                        size,
                         msg.url,
                         msg.payload,
                         extra,
+                        termion::color::Reset.fg_str()
                     ));
                 }
             }
@@ -193,11 +210,12 @@ impl FuzzBuster {
         let mut target = SingleFuzzScanResult {
             url: request.uri.to_string(),
             method: request.http_method.clone(),
-            status: StatusCode::default().to_string(),
+            status: StatusCode::default().as_u16(),
             payload: request.payload.clone(),
             body: request.http_body.clone(),
             error: None,
             extra: None,
+            size: None,
         };
         let mut target_err = target.clone();
         let mut target_err2 = target.clone();
@@ -279,19 +297,28 @@ impl FuzzBuster {
                 client
                     .request(request)
                     .and_then(move |res| {
-                        let status = res.status();
-                        target.status = status.to_string();
-                        if status.is_redirection() {
-                            target.extra = Some(
-                                res.headers()
-                                    .get("Location")
-                                    .unwrap()
-                                    .to_str()
-                                    .unwrap()
-                                    .to_owned(),
-                            );
-                        }
-
+                        target.status = res.status().as_u16();
+                        match res.headers().get(hyper::header::CONTENT_LENGTH) {
+                            Some(val) => { 
+                                target.size = Some(
+                                    val.to_str()
+                                        .unwrap()
+                                        .to_owned(),
+                                );
+                            }
+                            None => {}
+                        };
+                        match res.headers().get(hyper::header::LOCATION) {
+                            Some(val) => {
+                                target.extra = Some(
+                                    val.to_str()
+                                        .unwrap()
+                                        .to_owned(),
+                                );
+                            }
+                            None => {}
+                        };
+            
                         futures::future::ok(target).join(res.into_body().concat2())
                     })
                     .and_then(move |(target, body)| {

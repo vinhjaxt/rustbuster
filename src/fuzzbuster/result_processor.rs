@@ -5,17 +5,18 @@ use std::{fs::File, io::Write, path::Path, str};
 pub struct SingleFuzzScanResult {
     pub url: String,
     pub method: String,
-    pub status: String,
+    pub status: u16,
     pub error: Option<String>,
     pub extra: Option<String>,
+    pub size: Option<String>,
     pub payload: Vec<String>,
     pub body: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FuzzScanProcessorConfig {
-    pub include: Vec<String>,
-    pub ignore: Vec<String>,
+    pub include: Vec<u16>,
+    pub ignore: Vec<u16>,
     pub include_body: Vec<String>,
     pub ignore_body: Vec<String>,
 }
@@ -56,7 +57,7 @@ impl FuzzScanProcessor {
 
         if self.config.ignore.len() != 0 {
             for code in &self.config.ignore {
-                if res.status.starts_with(code) {
+                if res.status == *code {
                     return false;
                 }
             }
@@ -64,7 +65,7 @@ impl FuzzScanProcessor {
 
         if self.config.include.len() != 0 {
             for code in &self.config.include {
-                if res.status.starts_with(code) {
+                if res.status == *code {
                     self.results.push(res);
                     return true;
                 }

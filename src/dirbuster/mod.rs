@@ -33,7 +33,8 @@ fn make_request_future(
     let mut target = SingleDirScanResult {
         url: url.to_string(),
         method: Method::GET.to_string(),
-        status: StatusCode::default().to_string(),
+        status: StatusCode::default().as_u16(),
+        size: None,
         error: None,
         extra: None,
     };
@@ -55,18 +56,27 @@ fn make_request_future(
     client
         .request(request)
         .and_then(move |res| {
-            let status = res.status();
-            target.status = status.to_string();
-            if status.is_redirection() {
-                target.extra = Some(
-                    res.headers()
-                        .get("Location")
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_owned(),
-                );
-            }
+            target.status = res.status().as_u16();
+            match res.headers().get(hyper::header::CONTENT_LENGTH) {
+                Some(val) => { 
+                    target.size = Some(
+                        val.to_str()
+                            .unwrap()
+                            .to_owned(),
+                    );
+                }
+                None => {}
+            };
+            match res.headers().get(hyper::header::LOCATION) {
+                Some(val) => {
+                    target.extra = Some(
+                        val.to_str()
+                            .unwrap()
+                            .to_owned(),
+                    );
+                }
+                None => {}
+            };
 
             tx.send(target).unwrap();
             Ok(())

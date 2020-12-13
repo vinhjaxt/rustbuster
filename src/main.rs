@@ -3,6 +3,9 @@ extern crate log;
 #[macro_use]
 extern crate clap;
 
+mod size_display;
+
+use termion;
 use clap::{App, SubCommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::{sync::mpsc::channel, thread, time::SystemTime};
@@ -52,7 +55,7 @@ fn main() {
         .about("DirBuster for rust")
         .after_help("EXAMPLES:
     1. Dir mode:
-        rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e php
+        rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e .php
     2. Dns mode:
         rustbuster dns -d google.com -w examples/wordlist
     3. Vhost mode:
@@ -73,7 +76,7 @@ fn main() {
         .subcommand(set_wordlist_args(set_dir_args(set_http_args(set_common_args(SubCommand::with_name("dir")))))
             .about("Directories and files enumeration mode")
             .after_help("EXAMPLE:
-    rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e php"))
+    rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e .php"))
         .subcommand(set_wordlist_args(set_dns_args(set_common_args(SubCommand::with_name("dns"))))
             .about("A/AAAA entries enumeration mode")
             .after_help("EXAMPLE:
@@ -147,6 +150,7 @@ fn main() {
                 &http_args.url,
                 dir_args.extensions,
                 dir_args.append_slash,
+                dir_args.append_ext,
             );
             let total_numbers_of_request = urls.len();
             let (tx, rx) = channel::<SingleDirScanResult>();
@@ -170,7 +174,7 @@ fn main() {
             };
             bar.set_draw_delta(100);
             bar.set_style(ProgressStyle::default_bar()
-                .template("{spinner} [{elapsed_precise}] {bar:40.red/white} {pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
+                .template("{spinner} [{elapsed_precise}] [{bar:40.red/white}]\n  {pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
                 .progress_chars("#>-"));
 
             thread::spawn(move || dirbuster::run(tx, urls, config));
@@ -215,34 +219,48 @@ fn main() {
                     let mut extra = msg.extra.unwrap_or("".to_owned());
 
                     if !extra.is_empty() {
-                        extra = format!("\n\t\t\t\t\t\t=> {}", extra)
+                        extra = format!("{}  ->  {}", termion::color::Reset.fg_str(), extra)
                     }
 
-                    let n_tabs = match msg.status.len() / 8 {
-                        3 => 1,
-                        2 => 2,
-                        1 => 3,
-                        0 => 4,
-                        _ => 0,
-                    };
+                    let mut size = msg.size.unwrap_or("0".to_owned());
+                    match size.parse::<u64>() {
+                        Ok(n) => {
+                            size = format!("{:.1}", size_display::Size(n));
+                        },
+                        Err(_) => {},
+                    }
+
+                    let mut msgcolor = termion::color::Reset.fg_str();
+                    if msg.status == 200 {
+                        msgcolor = termion::color::Green.fg_str();
+                    } else if msg.status == 403 {
+                        msgcolor = termion::color::Blue.fg_str();
+                    } else if msg.status == 401 {
+                        msgcolor = termion::color::Yellow.fg_str();
+                    } else if !extra.is_empty() {
+                        msgcolor = termion::color::Cyan.fg_str();
+                    }
 
                     if common_args.no_progress_bar {
                         println!(
-                            "{}\t{}{}{}{}",
+                            "{}{}  {} - {:^7} -  {}{}",
+                            msgcolor,
                             msg.method,
                             msg.status,
-                            "\t".repeat(n_tabs),
+                            size,
                             msg.url,
                             extra
                         );
                     } else {
                         bar.println(format!(
-                            "{}\t{}{}{}{}",
+                            "{}{}  {} - {:^7} -  {}{}{}",
+                            msgcolor,
                             msg.method,
                             msg.status,
-                            "\t".repeat(n_tabs),
+                            size,
                             msg.url,
-                            extra
+                            extra,
+                            termion::color::Reset.fg_str()
                         ));
                     }
                 }
@@ -277,7 +295,7 @@ fn main() {
             };
             bar.set_draw_delta(25);
             bar.set_style(ProgressStyle::default_bar()
-                .template("{spinner} [{elapsed_precise}] {bar:40.red/white} {pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
+                .template("{spinner} [{elapsed_precise}] {bar:40.red/white}\n{pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
                 .progress_chars("#>-"));
 
             thread::spawn(move || dnsbuster::run(tx, domains, config));
@@ -381,7 +399,7 @@ fn main() {
             };
             bar.set_draw_delta(100);
             bar.set_style(ProgressStyle::default_bar()
-                .template("{spinner} [{elapsed_precise}] {bar:40.red/white} {pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
+                .template("{spinner} [{elapsed_precise}] {bar:40.red/white}\n{pos:>7}/{len:7} ETA: {eta_precise} req/s: {msg}")
                 .progress_chars("#>-"));
 
             thread::spawn(move || vhostbuster::run(tx, vhosts, config));

@@ -53,7 +53,7 @@ SUBCOMMANDS:
 
 EXAMPLES:
     1. Dir mode:
-        rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e php
+        rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e .php
     2. Dns mode:
         rustbuster dns -d google.com -w examples/wordlist
     3. Vhost mode:
@@ -105,7 +105,7 @@ OPTIONS:
     -w, --wordlist <wordlist>...                         Sets the wordlist
 
 EXAMPLE:
-    rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e php
+    rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e .php
 ```
 
 ### `dns` usage
