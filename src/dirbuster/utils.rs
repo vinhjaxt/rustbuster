@@ -77,13 +77,25 @@ pub fn build_urls(
                     }
                 }
             } else {
-                match RE_EXT.replace_all(url.as_str(), extension.as_str()).parse::<hyper::Uri>() {
-                    Ok(v) => {
-                        urls.push(v);
+                if RE_EXT.is_match(url.as_str()) {
+                    match RE_EXT.replace_all(url.as_str(), extension.as_str()).parse::<hyper::Uri>() {
+                        Ok(v) => {
+                            urls.push(v);
+                        }
+                        Err(e) => {
+                            trace!("URI: {}", e);
+                        }
                     }
-                    Err(e) => {
-                        trace!("URI: {}", e);
+                } else {
+                    match url.parse::<hyper::Uri>() {
+                        Ok(v) => {
+                            urls.push(v);
+                        }
+                        Err(e) => {
+                            trace!("URI: {}", e);
+                        }
                     }
+                    break;
                 }
             }
         }

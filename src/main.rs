@@ -55,7 +55,7 @@ fn main() {
         .about("DirBuster for rust")
         .after_help("EXAMPLES:
     1. Dir mode:
-        rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e .php
+        rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e php,aspx
     2. Dns mode:
         rustbuster dns -d google.com -w examples/wordlist
     3. Vhost mode:
@@ -76,7 +76,7 @@ fn main() {
         .subcommand(set_wordlist_args(set_dir_args(set_http_args(set_common_args(SubCommand::with_name("dir")))))
             .about("Directories and files enumeration mode")
             .after_help("EXAMPLE:
-    rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e .php"))
+    rustbuster dir -u http://localhost:3000/ -w examples/wordlist -e php,aspx"))
         .subcommand(set_wordlist_args(set_dns_args(set_common_args(SubCommand::with_name("dns"))))
             .about("A/AAAA entries enumeration mode")
             .after_help("EXAMPLE:
